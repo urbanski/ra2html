@@ -35,17 +35,21 @@ def html_foot():
 
 #handle command line stuff
 def handle_cmd_line():
-    parser = argparse.ArgumentParser(description='generates graphs from argus files')
-    parser.add_argument('-f, --file', dest="input_file", help="argus file to read", metavar="FILE")
-    parser.add_argument("-o","--output-directory", dest="output", help="output directory to create HTML files", metavar="FILE")
-    parser.add_argument("-t,--title", dest="title", help="set document title")
-    parser.add_argument("--top-talkers", dest="top_talkers", help="calculate top talkers")
-    parser.add_argument("--totals", dest="totals", help="calculate totals")
+    desc = """ra2html generates incident report and graphs from argus files.
+
+"""
+    
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument('-f, --file', required=True, dest="input_file", help="argus file to read", metavar="FILE")
+    parser.add_argument("-t,--title", dest="title", help="set report title")
+    parser.add_argument("--top-talkers", dest="top_talkers", help="calculate top talkers", type=int, default=0)
+    parser.add_argument("--totals", action="store_true", dest="totals", help="calculate totals")
+    parser.add_argument("--target", action="append", dest="target", help="perform individual analysis for specific addresses")
     (args) = parser.parse_args()
     
     #check preflight conditions
     if (args.input_file == None ):
-        parser.print_usage()
+        parser.print_help()
         sys.exit(0)
 
     #set a title of none exists
@@ -73,19 +77,57 @@ def get_totals(file):
     data = countproc.communicate()[0]
     return data
 
+def generate_flow_graph(file, target=""):
+    tempfile = get_tempfile()
+    
+    title = "Network Flow History"
+    sFilterPortion = ""
+    if (target != ""):
+        sFilterPortion = " - host %s" % target
+    cmd = "/usr/local/bin/ragraph bytes -r %s -M 30s -fill -stack -w %s %s" % (file, tempfile, sFilterPortion)
+    graphproc = Popen(shlex.split(cmd), stdout=PIPE)
+
+    return tempfile
+
+def history_analysis(file, target=""):
+    #the primary argus query
+    sFilterPortion = ""
+    if (target != ""):
+        sFilterPortion = " - host %s " % target
+    cmd="/usr/local/bin/ra -u -nnn -r %s -s stime saddr:128 sport:16 daddr:128 dport:16 proto bytes pkts %s" % (file, sFilterPortion)
+    p = Popen(shlex.split(cmd), stdout=PIPE)
+    
+    #get data from stdout
+    data = p.stdout
+    sFlowGraph = generate_flow_graph(file, target)
+    print "<center><img src=\"%s\"></center><br>" % sFlowGraph
+    print "<table>"
+    print "<tr><th>Timestamp</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Packets</th><th>Bytes</th></tr>"
+    
+    for line in data:
+        split = line.split()
+        print "<tr>"
+        for i in range(len(split)):
+            if i == 0:
+                print "<td>%s</td>" % datetime.datetime.fromtimestamp(int(split[i].split(".")[0])).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                print "<td>%s</td>" % split[i]
+            
+        print "</tr>"
+        
+    print "</table>"    
+
 
 #generate temp file path
 def get_tempfile():
-    return tempfile.TemporaryFile()
+    (tf, path) =  tempfile.mkstemp()
+    return path
 
+##########################
 #entrypoint
+##########################
 (args) = handle_cmd_line()
 
-cmd="/usr/local/bin/ra -u -nnn -r %s -s stime saddr:128 sport:16 daddr:128 dport:16 bytes pkts" % args.input_file
-p = Popen(shlex.split(cmd), stdout=PIPE)
-
-#get data from stdout
-data = p.stdout
 
 #what time is it?
 now = datetime.datetime.now()
@@ -97,7 +139,7 @@ print "<h1>%s</h1>" % args.title
 print "Generated %s by ra2html" % now.strftime("%Y-%m-%d %H:%M")
 
 #should we generate top talker statistics?
-if (args.top_talkers != None):
+if (args.top_talkers > 0):
     print "<h2>Top Talkers</h2>"
     print "<table>"
     print "<tr><th>Destination Address</th><th>Bytes</th><th>Packets</th></tr>"
@@ -108,27 +150,22 @@ if (args.top_talkers != None):
             print "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (split[0], split[1], split[2])
     print "</table>"
     
-if (args.totals != None):
+#should we generate totals?
+if (args.totals == True):
     print "<h2>Totals</h2>"
     totals = get_totals(args.input_file)
     print "<pre>%s</pre>" % totals
 
-print "<h2>All Flows</h2>"
-print "<table>"
-print "<tr><th>Timestamp</th><th>Source</th><th>Destination</th><th>Packets</th><th>Bytes</th></tr>"
+if (args.target != None):
+    targets = args.target
+    if (len(targets) > 0):
+        for target in targets:
+            print "<h2>%s</h2>" % target
+            history_analysis(args.input_file, target)
 
-for line in data:
-    split = line.split()
-    print "<tr>"
-    for i in range(len(split)):
-        if i == 0:
-            print "<td>%s</td>" % datetime.datetime.fromtimestamp(int(split[i].split(".")[0])).strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            print "<td>%s</td>" % split[i]
-        
-    print "</tr>"
-    
-print "</table>"    
+#do a history analysis for the entire file
+print "<h2>All Flows</h2>"
+history_analysis(args.input_file)
     
 #print footer
 html_foot()
