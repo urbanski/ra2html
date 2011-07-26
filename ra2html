@@ -5,11 +5,29 @@ import sys
 import argparse
 import tempfile
 import shlex
+import datetime
 from subprocess import Popen, PIPE
+
+#styles for use throughout the report
+def html_styles():
+    print """
+        <style>
+            body {
+                font-size: 10pt;
+            }
+            td {
+                font-family: courier;
+                font-size: 8pt;
+            }
+        </style> 
+    """
+
 
 #this is the html header
 def html_head(sTitle):
-    print "<html><head><title>%s</title></head><body>" % sTitle
+    print "<html><head><title>%s</title></head>" % sTitle
+    html_styles()
+    print "<body>"
 
 #this is the html footer
 def html_foot():
@@ -22,6 +40,7 @@ def handle_cmd_line():
     parser.add_argument("-o","--output-directory", dest="output", help="output directory to create HTML files", metavar="FILE")
     parser.add_argument("-t,--title", dest="title", help="set document title")
     parser.add_argument("--top-talkers", dest="top_talkers", help="calculate top talkers")
+    parser.add_argument("--totals", dest="totals", help="calculate totals")
     (args) = parser.parse_args()
     
     #check preflight conditions
@@ -31,11 +50,12 @@ def handle_cmd_line():
 
     #set a title of none exists
     if (args.title == None):
-	args.title = "Report for %s" % args.input_file
+        args.title = "Report for %s" % args.input_file
 
 
     return ( args)
     
+#generate top talker information
 def get_top_talkers(file, num):
     cmd = "/usr/local/bin/racluster -r %s -w - -m daddr " % (file)
     clusterproc = Popen(shlex.split(cmd), stdout=PIPE)
@@ -45,6 +65,14 @@ def get_top_talkers(file, num):
     
     data = sortproc.communicate()[0]
     return data
+
+#generate totals
+def get_totals(file):
+    cmd = "/usr/local/bin/racount -M proto -r %s " % file
+    countproc = Popen(shlex.split(cmd), stdout=PIPE)
+    data = countproc.communicate()[0]
+    return data
+
 
 #generate temp file path
 def get_tempfile():
@@ -59,11 +87,14 @@ p = Popen(shlex.split(cmd), stdout=PIPE)
 #get data from stdout
 data = p.stdout
 
+#what time is it?
+now = datetime.datetime.now()
+
+
 #print header
 html_head(args.title)
-
-if (args.title != ""):
-    print "<h1>%s</h1>" % args.title
+print "<h1>%s</h1>" % args.title
+print "Generated %s by ra2html" % now.strftime("%Y-%m-%d %H:%M")
 
 #should we generate top talker statistics?
 if (args.top_talkers != None):
@@ -76,6 +107,11 @@ if (args.top_talkers != None):
         if (len(split) == 3):
             print "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (split[0], split[1], split[2])
     print "</table>"
+    
+if (args.totals != None):
+    print "<h2>Totals</h2>"
+    totals = get_totals(args.input_file)
+    print "<pre>%s</pre>" % totals
 
 print "<h2>All Flows</h2>"
 print "<table>"
@@ -85,7 +121,11 @@ for line in data:
     split = line.split()
     print "<tr>"
     for i in range(len(split)):
-        print "<td>%s</td>" % split[i]
+        if i == 0:
+            print "<td>%s</td>" % datetime.datetime.fromtimestamp(int(split[i].split(".")[0])).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            print "<td>%s</td>" % split[i]
+        
     print "</tr>"
     
 print "</table>"    
