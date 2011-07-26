@@ -28,17 +28,22 @@ def handle_cmd_line():
     if (args.input_file == None ):
         parser.print_usage()
         sys.exit(0)
-    
+
+    #set a title of none exists
+    if (args.title == None):
+	args.title = "Report for %s" % args.input_file
+
+
     return ( args)
     
 def get_top_talkers(file, num):
-    cmd = "/usr/local/bin/racluster -nnn -r %s -w - -m daddr -N%s" % (file, num)
+    cmd = "/usr/local/bin/racluster -r %s -w - -m daddr " % (file)
     clusterproc = Popen(shlex.split(cmd), stdout=PIPE)
 
-    cmd = "rasort -r - -m bytes -s daddr:128 bytes pkts"
-    sortproc = Popen(shlex.split(cmd),stdin=clusterproc.stdout)
+    cmd = "/usr/local/bin/rasort -r - -nnn -m bytes -N%s -s daddr:128 bytes pkts" % num
+    sortproc = Popen(shlex.split(cmd),stdin=clusterproc.stdout, stdout=PIPE)
     
-    data = sortproc.stdout
+    data = sortproc.communicate()[0]
     return data
 
 #generate temp file path
@@ -48,7 +53,7 @@ def get_tempfile():
 #entrypoint
 (args) = handle_cmd_line()
 
-cmd="/usr/local/bin/ra -u -nnn -r %s -N10 -s stime saddr:128 sport:16 daddr:128 dport:16 bytes pkts" % args.input_file
+cmd="/usr/local/bin/ra -u -nnn -r %s -s stime saddr:128 sport:16 daddr:128 dport:16 bytes pkts" % args.input_file
 p = Popen(shlex.split(cmd), stdout=PIPE)
 
 #get data from stdout
@@ -65,9 +70,11 @@ if (args.top_talkers != None):
     print "<h2>Top Talkers</h2>"
     print "<table>"
     print "<tr><th>Destination Address</th><th>Bytes</th><th>Packets</th></tr>"
-    for talker in get_top_talkers(args.input_file, args.top_talkers):
+    ttl = get_top_talkers(args.input_file, args.top_talkers)
+    for talker in ttl.split("\n"):
         split = talker.split()
-        print "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (split[0], split[1], split[2])
+        if (len(split) == 3):
+            print "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (split[0], split[1], split[2])
     print "</table>"
 
 print "<h2>All Flows</h2>"
