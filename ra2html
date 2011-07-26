@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+import tempfile
+import shlex
+from subprocess import Popen, PIPE
+
+#this is the html header
+def html_head(sTitle):
+    print "<html><head><title>%s</title></head><body>" % sTitle
+
+#this is the html footer
+def html_foot():
+    print "</body></html>"
+
+#handle command line stuff
+def handle_cmd_line():
+    parser = argparse.ArgumentParser(description='generates graphs from argus files')
+    parser.add_argument('-f, --file', dest="input_file", help="argus file to read", metavar="FILE")
+    parser.add_argument("-o","--output-directory", dest="output", help="output directory to create HTML files", metavar="FILE")
+    parser.add_argument("-t,--title", dest="title", help="set document title")
+    parser.add_argument("--top-talkers", dest="top_talkers", help="calculate top talkers")
+    (args) = parser.parse_args()
+    
+    #check preflight conditions
+    if (args.input_file == None ):
+        parser.print_usage()
+        sys.exit(0)
+    
+    return ( args)
+    
+def get_top_talkers(file, num):
+    cmd = "/usr/local/bin/racluster -nnn -r %s -w - -m daddr -N%s" % (file, num)
+    clusterproc = Popen(shlex.split(cmd), stdout=PIPE)
+
+    cmd = "rasort -r - -m bytes -s daddr:128 bytes pkts"
+    sortproc = Popen(shlex.split(cmd),stdin=clusterproc.stdout)
+    
+    data = sortproc.stdout
+    return data
+
+#generate temp file path
+def get_tempfile():
+    return tempfile.TemporaryFile()
+
+#entrypoint
+(args) = handle_cmd_line()
+
+cmd="/usr/local/bin/ra -u -nnn -r %s -N10 -s stime saddr:128 sport:16 daddr:128 dport:16 bytes pkts" % args.input_file
+p = Popen(shlex.split(cmd), stdout=PIPE)
+
+#get data from stdout
+data = p.stdout
+
+#print header
+html_head(args.title)
+
+if (args.title != ""):
+    print "<h1>%s</h1>" % args.title
+
+#should we generate top talker statistics?
+if (args.top_talkers != None):
+    print "<h2>Top Talkers</h2>"
+    print "<table>"
+    print "<tr><th>Destination Address</th><th>Bytes</th><th>Packets</th></tr>"
+    for talker in get_top_talkers(args.input_file, args.top_talkers):
+        split = talker.split()
+        print "<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % (split[0], split[1], split[2])
+    print "</table>"
+
+print "<h2>All Flows</h2>"
+print "<table>"
+print "<tr><th>Timestamp</th><th>Source</th><th>Destination</th><th>Packets</th><th>Bytes</th></tr>"
+
+for line in data:
+    split = line.split()
+    print "<tr>"
+    for i in range(len(split)):
+        print "<td>%s</td>" % split[i]
+    print "</tr>"
+    
+print "</table>"    
+    
+#print footer
+html_foot()
