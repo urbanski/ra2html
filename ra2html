@@ -29,6 +29,10 @@ def html_styles(stylesheet=""):
                 }
             </style> 
         """
+    
+    #support for sortable tables -  see http://www.kryogenix.org/code/browser/sorttable/
+    print "<script src=\"http://www.kryogenix.org/code/browser/sorttable/sorttable.js\"></script>"
+    
 
 #this is the html header
 def html_head(sTitle, sStylesheet):
@@ -109,7 +113,7 @@ def history_analysis(file, target=""):
     data = p.stdout
     sFlowGraph = generate_flow_graph(file, target)
     print "<center><img src=\"%s\"></center><br>" % sFlowGraph
-    print "<table class='flow_table'>"
+    print "<table id='flow_table' class='sortable'>"
     print "<tr><th>Timestamp</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Packets</th><th>Bytes</th></tr>"
     
     for line in data:

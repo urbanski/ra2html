@@ -13,7 +13,7 @@ td {
 
 
 #flow_table is a table that contains flow data
-.flow_table {
+#flow_table {
     width: 100%;
 }
 
