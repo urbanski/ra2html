@@ -1,0 +1,22 @@
+#This is a generic stylesheet for use with ra2html
+#####################################################
+
+body {
+    font-size: 10pt;
+}
+
+td {
+    font-family: courier;
+    font-size: 8pt;
+}
+
+
+
+#flow_table is a table that contains flow data
+.flow_table {
+    width: 100%;
+}
+
+#header {
+    border: 1px solid #000;
+}

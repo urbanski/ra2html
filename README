@@ -2,6 +2,7 @@ ra2html - converts argus files to html summaries
 
 usage: ra2html [-h] -f, --file FILE [-t,--title TITLE]
                [--top-talkers TOP_TALKERS] [--totals] [--target TARGET]
+               [-s STYLESHEET]
 
 ra2html generates incident report and graphs from argus files.
 
@@ -13,7 +14,7 @@ optional arguments:
                         calculate top talkers
   --totals              calculate totals
   --target TARGET       perform individual analysis for specific addresses
-
+  -s STYLESHEET         use a custom css stylesheet
 
 An input file (-f, --file) is always required.
 

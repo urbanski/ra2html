@@ -6,27 +6,34 @@ import argparse
 import tempfile
 import shlex
 import datetime
+import shutil
 from subprocess import Popen, PIPE
 
 #styles for use throughout the report
-def html_styles():
-    print """
-        <style>
-            body {
-                font-size: 10pt;
-            }
-            td {
-                font-family: courier;
-                font-size: 8pt;
-            }
-        </style> 
-    """
-
+def html_styles(stylesheet=""):
+    #use a stylesheet if one is specified
+    if (stylesheet != ""):
+        sspath = get_tempfile()
+        shutil.copyfile(stylesheet, sspath)
+        print "<link href=\"%s\" media=\"screen\" rel=\"stylesheet\" type=\"text/css\" />" % sspath
+    else:
+        #default styles
+        print """
+            <style>
+                body {
+                    font-size: 10pt;
+                }
+                td {
+                    font-family: courier;
+                    font-size: 8pt;
+                }
+            </style> 
+        """
 
 #this is the html header
-def html_head(sTitle):
+def html_head(sTitle, sStylesheet):
     print "<html><head><title>%s</title></head>" % sTitle
-    html_styles()
+    html_styles(sStylesheet)
     print "<body>"
 
 #this is the html footer
@@ -45,6 +52,7 @@ def handle_cmd_line():
     parser.add_argument("--top-talkers", dest="top_talkers", help="calculate top talkers", type=int, default=0)
     parser.add_argument("--totals", action="store_true", dest="totals", help="calculate totals")
     parser.add_argument("--target", action="append", dest="target", help="perform individual analysis for specific addresses")
+    parser.add_argument("-s", dest="stylesheet", help="use a custom css stylesheet", default="")
     (args) = parser.parse_args()
     
     #check preflight conditions
@@ -101,7 +109,7 @@ def history_analysis(file, target=""):
     data = p.stdout
     sFlowGraph = generate_flow_graph(file, target)
     print "<center><img src=\"%s\"></center><br>" % sFlowGraph
-    print "<table>"
+    print "<table class='flow_table'>"
     print "<tr><th>Timestamp</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Packets</th><th>Bytes</th></tr>"
     
     for line in data:
@@ -134,8 +142,8 @@ now = datetime.datetime.now()
 
 
 #print header
-html_head(args.title)
-print "<h1>%s</h1>" % args.title
+html_head(args.title, args.stylesheet)
+print "<div id=\"header\"><h1>%s</h1></div>" % args.title
 print "Generated %s by ra2html" % now.strftime("%Y-%m-%d %H:%M")
 
 #should we generate top talker statistics?
